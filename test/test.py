@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+
 import tensorflow as tf
 
 import glob
@@ -92,7 +97,6 @@ def generate_and_save_images(model, epoch, test_input):
   # This is so all layers run in inference mode (batchnorm).
   predictions = model(test_input, training=False)
 
-  import matplotlib.pyplot as plt
   fig = plt.figure(figsize=(4,4))
 
   for i in range(predictions.shape[0]):
@@ -101,7 +105,7 @@ def generate_and_save_images(model, epoch, test_input):
       plt.axis('off')
 
   plt.savefig('image_at_epoch_{:04d}.png'.format(epoch))
-  plt.show()
+#  plt.show()
 
 # Display a single image using the epoch number
 def display_image(epoch_no):
@@ -121,8 +125,7 @@ def train(dataset, epochs):
                              epoch + 1,
                              seed)
 
-    # Save the model every 15 epochs
-    if (epoch + 1) % 15 == 0:
+    if (epoch + 1) % 3 == 0:
       checkpoint.save(file_prefix = checkpoint_prefix)
 
     print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
