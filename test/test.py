@@ -43,8 +43,7 @@ def make_generator_model():
 
 def make_discriminator_model():
     model = tf.keras.Sequential()
-    model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
-                                     input_shape=[28, 28, 1]))
+    model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same', input_shape=[28, 28, 1]))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.3))
 
@@ -105,7 +104,6 @@ def generate_and_save_images(model, epoch, test_input):
       plt.axis('off')
 
   plt.savefig('image_at_epoch_{:04d}.png'.format(epoch))
-#  plt.show()
 
 # Display a single image using the epoch number
 def display_image(epoch_no):
@@ -121,9 +119,7 @@ def train(dataset, epochs):
 
     # Produce images for the GIF as we go
     # display.clear_output(wait=True)
-    generate_and_save_images(generator,
-                             epoch + 1,
-                             seed)
+    generate_and_save_images(generator, epoch + 1, seed)
 
     if (epoch + 1) % 3 == 0:
       checkpoint.save(file_prefix = checkpoint_prefix)
@@ -132,9 +128,7 @@ def train(dataset, epochs):
 
   # Generate after the final epoch
   # display.clear_output(wait=True)
-  generate_and_save_images(generator,
-                           epochs,
-                           seed)
+  generate_and_save_images(generator, epochs, seed)
 
 
 (train_images, train_labels), (_, _) = tf.keras.datasets.mnist.load_data()
