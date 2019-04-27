@@ -183,6 +183,8 @@ checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                  discriminator=discriminator)
 
 
+checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+
 EPOCHS = 50
 noise_dim = 100
 num_examples_to_generate = 16
