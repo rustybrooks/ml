@@ -2,11 +2,9 @@
 
 import matplotlib
 matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
-
-
 import tensorflow as tf
-
 import glob
 import imageio
 import numpy as np
@@ -15,7 +13,15 @@ import PIL
 from tensorflow.keras import layers
 import time
 
-# from IPython import display
+
+
+EPOCHS = 50
+noise_dim = 100
+num_examples_to_generate = 16
+BUFFER_SIZE = 60000
+BATCH_SIZE = 256
+# BATCH_SIZE = 64
+
 
 def make_generator_model():
     model = tf.keras.Sequential()
@@ -40,6 +46,7 @@ def make_generator_model():
     assert model.output_shape == (None, 28, 28, 1)
 
     return model
+
 
 def make_discriminator_model():
     model = tf.keras.Sequential()
@@ -75,13 +82,13 @@ def train_step(images):
     noise = tf.random.normal([BATCH_SIZE, noise_dim])
 
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-      generated_images = generator(noise, training=True)
+        generated_images = generator(noise, training=True)
 
-      real_output = discriminator(images, training=True)
-      fake_output = discriminator(generated_images, training=True)
+        real_output = discriminator(images, training=True)
+        fake_output = discriminator(generated_images, training=True)
 
-      gen_loss = generator_loss(fake_output)
-      disc_loss = discriminator_loss(real_output, fake_output)
+        gen_loss = generator_loss(fake_output)
+        disc_loss = discriminator_loss(real_output, fake_output)
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.trainable_variables)
     gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
@@ -91,112 +98,89 @@ def train_step(images):
 
 
 def generate_and_save_images(model, epoch, test_input):
-  print "generate and save", epoch
-  # Notice `training` is set to False.
-  # This is so all layers run in inference mode (batchnorm).
-  predictions = model(test_input, training=False)
+    # Notice `training` is set to False.
+    # This is so all layers run in inference mode (batchnorm).
+    predictions = model(test_input, training=False)
 
-  fig = plt.figure(figsize=(4,4))
+    fig = plt.figure(figsize=(4,4))
 
-  for i in range(predictions.shape[0]):
-      plt.subplot(4, 4, i+1)
-      plt.imshow(predictions[i, :, :, 0] * 127.5 + 127.5, cmap='gray')
-      plt.axis('off')
+    for i in range(predictions.shape[0]):
+        plt.subplot(4, 4, i+1)
+        plt.imshow(predictions[i, :, :, 0] * 127.5 + 127.5, cmap='gray')
+        plt.axis('off')
 
-  plt.savefig('image_at_epoch_{:04d}.png'.format(epoch))
-
-# Display a single image using the epoch number
-def display_image(epoch_no):
-  return PIL.Image.open('image_at_epoch_{:04d}.png'.format(epoch_no))
+    plt.savefig('image_at_epoch_{:04d}.png'.format(int(step)))
+    plt.close(fig)
 
 
 def train(dataset, epochs):
-  for epoch in range(epochs):
-    start = time.time()
+    for epoch in range(epochs - step):
+        print("Start epoch {}".format(int(step)))
+        start = time.time()
 
-    for image_batch in dataset:
-      train_step(image_batch)
+        for image_batch in dataset:
+            train_step(image_batch)
 
-    # Produce images for the GIF as we go
+        # Produce images for the GIF as we go
+        generate_and_save_images(generator, epoch + 1, seed)
+
+        step.assign_add(1)
+        if int(step) % 1 == 0:
+            save_path = manager.save()
+            print("Saved checkpoint for step {}: {}".format(int(step), save_path))
+            # print("loss {:1.2f}".format(loss.numpy()))
+
+        print ('Time for epoch {} is {} sec'.format(int(step), time.time()-start))
+
+    # Generate after the final epoch
     # display.clear_output(wait=True)
-    generate_and_save_images(generator, epoch + 1, seed)
-
-    if (epoch + 1) % 3 == 0:
-      checkpoint.save(file_prefix = checkpoint_prefix)
-
-    print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
-
-  # Generate after the final epoch
-  # display.clear_output(wait=True)
-  generate_and_save_images(generator, epochs, seed)
+    generate_and_save_images(generator, epochs, seed)
 
 
 (train_images, train_labels), (_, _) = tf.keras.datasets.mnist.load_data()
 
 train_images = train_images.reshape(train_images.shape[0], 28, 28, 1).astype('float32')
-train_images = (train_images - 127.5) / 127.5 # Normalize the images to [-1, 1]
+train_images = (train_images - 127.5) / 127.5  # Normalize the images to [-1, 1]
 
-BUFFER_SIZE = 60000
-BATCH_SIZE = 256
 
 # Batch and shuffle the data
-train_dataset = tf.data.Dataset.from_tensor_slices(train_images).shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
-
-
-
+train_dataset = tf.data.Dataset.from_tensor_slices(train_images).take(10000)
+train_dataset = train_dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
 
 generator = make_generator_model()
-
-noise = tf.random.normal([1, 100])
-generated_image = generator(noise, training=False)
-
-# plt.imshow(generated_image[0, :, :, 0], cmap='gray')
-
-
-
-
 discriminator = make_discriminator_model()
-decision = discriminator(generated_image)
-print (decision)
-
 
 # This method returns a helper function to compute cross entropy loss
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
-
-
-
 generator_optimizer = tf.keras.optimizers.Adam(1e-4)
 discriminator_optimizer = tf.keras.optimizers.Adam(1e-4)
 
+seed = tf.Variable(tf.random.normal([num_examples_to_generate, noise_dim]))
+step = tf.Variable(1)
+
 checkpoint_dir = './training_checkpoints'
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
-checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
-                                 discriminator_optimizer=discriminator_optimizer,
-                                 generator=generator,
-                                 discriminator=discriminator)
+checkpoint = tf.train.Checkpoint(
+    step=step,
+    generator_optimizer=generator_optimizer,
+    discriminator_optimizer=discriminator_optimizer,
+    generator=generator,
+    discriminator=discriminator,
+    seed=seed,
+)
+manager = tf.train.CheckpointManager(checkpoint, checkpoint_prefix, max_to_keep=3)
 
+checkpoint.restore(manager.latest_checkpoint)
+if manager.latest_checkpoint:
+    print("Restored from {}".format(manager.latest_checkpoint))
+else:
+    print("Initializing from scratch.")
 
-checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
-
-EPOCHS = 50
-noise_dim = 100
-num_examples_to_generate = 16
-
-# We will reuse this seed overtime (so it's easier)
-# to visualize progress in the animated GIF)
-seed = tf.random.normal([num_examples_to_generate, noise_dim])
-
-
-
-
+# print "seed", seed[0]
 
 
 train(train_dataset, EPOCHS)
-
-
-
-# display_image(EPOCHS)
 
 
 # anim_file = 'dcgan.gif'
