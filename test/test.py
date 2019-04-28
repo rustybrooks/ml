@@ -4,12 +4,8 @@ import matplotlib
 matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
-import tensorflow as tf
-import glob
-import imageio
-import numpy as np
 import os
-import PIL
+import tensorflow as tf
 from tensorflow.keras import layers
 import time
 
@@ -20,7 +16,6 @@ noise_dim = 100
 num_examples_to_generate = 16
 BUFFER_SIZE = 60000
 BATCH_SIZE = 256
-# BATCH_SIZE = 64
 
 
 def make_generator_model():
@@ -144,7 +139,7 @@ train_images = (train_images - 127.5) / 127.5  # Normalize the images to [-1, 1]
 
 
 # Batch and shuffle the data
-train_dataset = tf.data.Dataset.from_tensor_slices(train_images).take(10000)
+train_dataset = tf.data.Dataset.from_tensor_slices(train_images)
 train_dataset = train_dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
 
 generator = make_generator_model()
@@ -177,29 +172,6 @@ if manager.latest_checkpoint:
 else:
     print("Initializing from scratch.")
 
-# print "seed", seed[0]
-
-
 train(train_dataset, EPOCHS)
 
 
-# anim_file = 'dcgan.gif'
-#
-# with imageio.get_writer(anim_file, mode='I') as writer:
-#   filenames = glob.glob('image*.png')
-#   filenames = sorted(filenames)
-#   last = -1
-#   for i,filename in enumerate(filenames):
-#     frame = 2*(i**0.5)
-#     if round(frame) > round(last):
-#       last = frame
-#     else:
-#       continue
-#     image = imageio.imread(filename)
-#     writer.append_data(image)
-#   image = imageio.imread(filename)
-#   writer.append_data(image)
-#
-# import IPython
-# if IPython.version_info > (6,2,0,''):
-#   display.Image(filename=anim_file)
