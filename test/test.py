@@ -17,9 +17,9 @@ num_examples_to_generate = 16
 BUFFER_SIZE = 60000
 BATCH_SIZE = 256
 
-checkpoint_dir = os.path.splitext(os.path.split(os.path.realpath(__file__))[-1])[0]
-checkpoint_prefix = os.path.join('.', checkpoint_dir, "ckpt")
-
+filename = os.path.splitext(os.path.split(os.path.realpath(__file__))[-1])[0]
+checkpoint_prefix = os.path.join('./checkpoints', filename)
+print checkpoint_prefix
 
 def make_generator_model():
     model = tf.keras.Sequential()
