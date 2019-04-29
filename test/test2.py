@@ -8,17 +8,56 @@ import os.path
 import tensorflow as tf
 from tensorflow.keras import layers
 import time
-import sys
+import numpy as np
 
-
-EPOCHS = 100
+EPOCHS = 50
 noise_dim = 100
-num_examples_to_generate = 16
+num_examples_to_generate = 25
 BUFFER_SIZE = 60000
 BATCH_SIZE = 256
 
 checkpoint_dir = os.path.splitext(os.path.split(os.path.realpath(__file__))[-1])[0]
 checkpoint_prefix = os.path.join('.', checkpoint_dir, "ckpt")
+
+digit_tensor = tf.convert_to_tensor([float(x) for x in range(10)])
+
+def random_choice(a, axis, samples_shape=None):
+    """
+
+    :param a: tf.Tensor
+    :param axis: int axis to sample along
+    :param samples_shape: (optional) shape of samples to produce. if not provided, will sample once.
+    :returns: tf.Tensor of shape a.shape[:axis] + samples_shape + a.shape[axis + 1:]
+    :rtype:
+
+    Examples:
+    >>> a = tf.placeholder(shape=(10, 20, 30), dtype=tf.float32)
+    >>> random_choice(a, axis=0)
+    <tf.Tensor 'GatherV2:0' shape=(1, 20, 30) dtype=float32>
+    >>> random_choice(a, axis=1)
+    <tf.Tensor 'GatherV2_1:0' shape=(10, 1, 30) dtype=float32>
+    >>> random_choice(a, axis=1, samples_shape=(2, 3))
+    <tf.Tensor 'GatherV2_2:0' shape=(10, 2, 3, 30) dtype=float32
+    >>> random_choice(a, axis=0, samples_shape=(100,))
+    <tf.Tensor 'GatherV2_3:0' shape=(100, 20, 30) dtype=float32>
+    """
+
+    if samples_shape is None:
+        samples_shape = (1,)
+    shape = tuple(a.get_shape().as_list())
+    dim = shape[axis]
+    choice_indices = tf.random.uniform(samples_shape, minval=0, maxval=dim, dtype=tf.int32)
+    samples = tf.gather(a, choice_indices, axis=axis)
+    print samples
+    return samples
+
+
+def generate_noise(batch_size):
+    noise = tf.concat(
+        random_choice(digit_tensor, 0, [batch_size, 1]),
+        tf.random.normal([batch_size, noise_dim])
+    )
+    return noise
 
 
 def make_generator_model():
@@ -77,7 +116,7 @@ def generator_loss(fake_output):
 # This annotation causes the function to be "compiled".
 @tf.function
 def train_step(images):
-    noise = tf.random.normal([BATCH_SIZE, noise_dim])
+    noise = generate_noise(BATCH_SIZE)
 
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         generated_images = generator(noise, training=True)
@@ -100,7 +139,7 @@ def generate_and_save_images(model, epoch, test_input):
     # This is so all layers run in inference mode (batchnorm).
     predictions = model(test_input, training=False)
 
-    fig = plt.figure(figsize=(4,4))
+    fig = plt.figure(figsize=(5,5))
 
     for i in range(predictions.shape[0]):
         plt.subplot(4, 4, i+1)
@@ -135,44 +174,45 @@ def train(dataset, epochs):
     generate_and_save_images(generator, epochs, seed)
 
 
-(train_images, train_labels), (_, _) = tf.keras.datasets.mnist.load_data()
+# (train_images, train_labels), (_, _) = tf.keras.datasets.mnist.load_data()
+#
+# train_images = train_images.reshape(train_images.shape[0], 28, 28, 1).astype('float32')
+# train_images = (train_images - 127.5) / 127.5  # Normalize the images to [-1, 1]
+#
+#
+# # Batch and shuffle the data
+# train_dataset = tf.data.Dataset.from_tensor_slices(train_images)
+# train_dataset = train_dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
+#
+# generator = make_generator_model()
+# discriminator = make_discriminator_model()
+#
+# # This method returns a helper function to compute cross entropy loss
+# cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+#
+# generator_optimizer = tf.keras.optimizers.Adam(1e-4)
+# discriminator_optimizer = tf.keras.optimizers.Adam(1e-4)
 
-train_images = train_images.reshape(train_images.shape[0], 28, 28, 1).astype('float32')
-train_images = (train_images - 127.5) / 127.5  # Normalize the images to [-1, 1]
-
-
-# Batch and shuffle the data
-train_dataset = tf.data.Dataset.from_tensor_slices(train_images)
-train_dataset = train_dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
-
-generator = make_generator_model()
-discriminator = make_discriminator_model()
-
-# This method returns a helper function to compute cross entropy loss
-cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-
-generator_optimizer = tf.keras.optimizers.Adam(1e-4)
-discriminator_optimizer = tf.keras.optimizers.Adam(1e-4)
-
-seed = tf.Variable(tf.random.normal([num_examples_to_generate, noise_dim]))
-step = tf.Variable(1)
-
-checkpoint = tf.train.Checkpoint(
-    step=step,
-    generator_optimizer=generator_optimizer,
-    discriminator_optimizer=discriminator_optimizer,
-    generator=generator,
-    discriminator=discriminator,
-    seed=seed,
-)
-manager = tf.train.CheckpointManager(checkpoint, checkpoint_prefix, max_to_keep=3)
-
-checkpoint.restore(manager.latest_checkpoint)
-if manager.latest_checkpoint:
-    print("Restored from {}".format(manager.latest_checkpoint))
-else:
-    print("Initializing from scratch.")
-
-train(train_dataset, EPOCHS)
-
+seed = tf.Variable(generate_noise(1))
+print seed[0]
+# step = tf.Variable(1)
+#
+# checkpoint = tf.train.Checkpoint(
+#     step=step,
+#     generator_optimizer=generator_optimizer,
+#     discriminator_optimizer=discriminator_optimizer,
+#     generator=generator,
+#     discriminator=discriminator,
+#     seed=seed,
+# )
+# manager = tf.train.CheckpointManager(checkpoint, checkpoint_prefix, max_to_keep=3)
+#
+# checkpoint.restore(manager.latest_checkpoint)
+# if manager.latest_checkpoint:
+#     print("Restored from {}".format(manager.latest_checkpoint))
+# else:
+#     print("Initializing from scratch.")
+#
+# train(train_dataset, EPOCHS)
+#
 
